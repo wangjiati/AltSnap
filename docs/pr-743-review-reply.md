@@ -5,11 +5,11 @@
 
 ---
 
-## Disclosure: AI-assisted development
+## A quick note before we start
 
-To be fully transparent: I used Claude (Anthropic's AI coding assistant) to help with the code integration, including porting the PeekDesktop logic to C, structuring the PR commits, and reviewing the diff. All code was manually reviewed and tested by me on actual hardware before submission. The bugs you found (dead code, class name filters, LVM_HITTEST value) are my responsibility — I should have caught them during review.
+I want to be upfront: I used Claude (Anthropic's AI coding assistant) to help port the PeekDesktop logic to C, organize commits, and write the PR. I did all the manual testing on real hardware myself. The bugs you spotted — dead code, class name filters, wrong LVM_HITTEST value — those are on me, I should have reviewed the AI output more carefully.
 
-Also please note: my native language is Chinese, and this reply was written with translation assistance. I apologize for any awkward phrasing.
+Also, Chinese is my native language and this reply was written with translation help, so please excuse any phrasing that sounds unnatural.
 
 ---
 
