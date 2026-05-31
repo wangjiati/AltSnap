@@ -9,6 +9,8 @@
 
 To be fully transparent: I used Claude (Anthropic's AI coding assistant) to help with the code integration, including porting the PeekDesktop logic to C, structuring the PR commits, and reviewing the diff. All code was manually reviewed and tested by me on actual hardware before submission. The bugs you found (dead code, class name filters, LVM_HITTEST value) are my responsibility — I should have caught them during review.
 
+Also please note: my native language is Chinese, and this reply was written with translation assistance. I apologize for any awkward phrasing.
+
 ---
 
 Thanks so much for the thorough review — I really appreciate you taking the time to go through the code carefully.
