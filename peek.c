@@ -27,16 +27,6 @@ void PeekCleanup(void);
 #define PEEK_FLYAWAY_STEPS 12
 #define PEEK_FLYAWAY_MS    160
 
-/* LVHITTESTINFO for cross-process desktop icon detection */
-typedef struct {
-    POINT pt;
-    UINT flags;
-    int iItem;
-    int iSubItem;
-    int iGroup;
-} PEEK_LVHITTESTINFO;
-#define PEEK_LVM_HITTEST 0x1009
-
 /* Saved window entry */
 struct peek_wnd { HWND hwnd; WINDOWPLACEMENT wp; RECT bounds; };
 typedef struct { struct peek_wnd *it; size_t count; size_t cap; } PeekWndList;
@@ -73,48 +63,6 @@ static BOOL IsDesktopRelatedWindow(HWND hwnd)
         cur = GetParent(cur);
     }
     return FALSE;
-}
-
-static HWND FindDesktopListView(void)
-{
-    HWND progman = FindWindow(TEXT("Progman"), NULL);
-    if (!progman) return NULL;
-    HWND sv = FindWindowEx(progman, NULL, TEXT("SHELLDLL_DefView"), NULL);
-    if (!sv) {
-        HWND ww = NULL;
-        while ((ww = FindWindowEx(NULL, ww, TEXT("WorkerW"), NULL))) {
-            if (FindWindowEx(ww, NULL, TEXT("SHELLDLL_DefView"), NULL)) {
-                sv = FindWindowEx(ww, NULL, TEXT("SHELLDLL_DefView"), NULL);
-                break;
-            }
-        }
-    }
-    if (!sv) return NULL;
-    return FindWindowEx(sv, NULL, TEXT("SysListView32"), NULL);
-}
-
-static BOOL IsDesktopIcon(POINT pt)
-{
-    HWND lv = FindDesktopListView();
-    if (!lv) return FALSE;
-    DWORD pid;
-    GetWindowThreadProcessId(lv, &pid);
-    HANDLE proc = OpenProcess(PROCESS_VM_OPERATION|PROCESS_VM_WRITE|PROCESS_VM_READ, FALSE, pid);
-    if (!proc) return FALSE;
-    PEEK_LVHITTESTINFO *remote = (PEEK_LVHITTESTINFO *)VirtualAllocEx(
-        proc, NULL, sizeof(PEEK_LVHITTESTINFO), MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
-    if (!remote) { CloseHandle(proc); return FALSE; }
-    PEEK_LVHITTESTINFO local;
-    mem00(&local, sizeof(local));
-    local.pt = pt;
-    WriteProcessMemory(proc, remote, &local, sizeof(local), NULL);
-    LRESULT hit;
-    SendMessageTimeout(lv, PEEK_LVM_HITTEST, 0, (LPARAM)remote,
-                       SMTO_ABORTIFHUNG, 500, (PDWORD_PTR)&hit);
-    ReadProcessMemory(proc, remote, &local, sizeof(local), NULL);
-    VirtualFreeEx(proc, remote, 0, MEM_RELEASE);
-    CloseHandle(proc);
-    return (local.iItem >= 0);
 }
 
 static BOOL IsDesktopBackground(POINT pt)
@@ -239,8 +187,6 @@ static BOOL CALLBACK EnumPeekWindows(HWND hwnd, LPARAM lParam)
     if (lstrcmp(cn, TEXT("Shell_SecondaryTrayWnd")) == 0) return TRUE;
     if (lstrcmp(cn, TEXT("NotifyIconOverflowWindow")) == 0) return TRUE;
     if (lstrcmp(cn, TEXT("DV2ControlHost")) == 0) return TRUE;
-    if (lstrcmp(cn, TEXT("Windows.UI.Core.CoreWindow")) == 0) return TRUE;
-    if (lstrcmp(cn, TEXT("ApplicationFrameWindow")) == 0) return TRUE;
 
     /* Skip tool windows and no-activate windows */
     LONG_PTR ex = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
@@ -349,7 +295,10 @@ static void FlyBackAll(void)
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Focus watcher (restore on app switch)
+// Focus watcher — restore on app switch
+// Only installed while peeking when PeekFlags & PEEK_F_RESTOREONAPP is set.
+// Watches EVENT_SYSTEM_FOREGROUND so that when the user Alt+Tabs away
+// from the desktop after peeking, windows are automatically restored.
 
 static void CALLBACK PeekWinEventProc(
     HWINEVENTHOOK hWinEventHook, DWORD event,
@@ -364,6 +313,7 @@ static void CALLBACK PeekWinEventProc(
     PeekRestoreAll();
 }
 
+/* Only called when PeekFlags & PEEK_F_RESTOREONAPP is set */
 static void PeekInstallFocusHook(void)
 {
     if (peek.focus_hook) return;
